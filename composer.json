@@ -20,7 +20,7 @@
         "tekton/support": "^1.0.0",
         "illuminate/view": "~5.4.0",
         "illuminate/contracts": "~5.4.0",
-        "nsrosenqvist/blade-compiler": "^1.0.0",
+        "nsrosenqvist/blade-compiler": "^1.1.1",
         "jjgrainger/posttypes": "^1.0",
 
         "wpackagist-plugin/cmb2": "2.2.4",
