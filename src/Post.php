@@ -31,7 +31,7 @@ class Post extends SmartObject implements ValidityChecking {
         switch ($key) {
             case 'title': $result = get_the_title($this->post); break;
             case 'url': $result = get_permalink($this->post); break;
-            case 'content': $result = wpautop(get_post_field('post_content', $this->post)); break;
+            case 'content': $result = do_shortcode(wpautop(get_post_field('post_content', $this->post))); break;
             case 'excerpt': $result = $this->excerpt(); break; // $result = get_the_excerpt($this->post); break;
             case 'author': $result = get_the_author_meta('display_name', get_post_field('post_author', $this->post)); break;
             case 'category_links': $result = explode('|||', get_the_category_list('|||', '', $this->id)); break;
