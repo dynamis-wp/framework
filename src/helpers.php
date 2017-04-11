@@ -324,7 +324,7 @@ function is_admin_edit($slug = null) {
     return false;
 }
 
-function __post($object) {
+function __post($object = null) {
     if ($object instanceof \WP_Query) {
         $object->the_post();
         global $post;
@@ -333,6 +333,7 @@ function __post($object) {
         $post = get_post((int) $object);
     }
     else {
+        the_post();
         global $post;
     }
 
