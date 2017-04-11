@@ -10,13 +10,13 @@ To get started, just require the project in your composer configuration and init
 // Autoload classes
 require_once __DIR__ . '/vendor/autoload.php';
 
-use \Tekton\Wordpress\Application;
+use \Tekton\Wordpress\Framework;
 
 // Theme constants
 define('THEME_PREFIX', '_mytheme_');
 define('DATE_FORMAT', 'M j, Y');
 
-Application::instance()->init();
+Framework::instance()->init();
 ```
 
 ## Features

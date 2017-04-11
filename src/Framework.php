@@ -1,11 +1,13 @@
 <?php namespace Tekton\Wordpress;
 
-use \Tekton\Application as BaseApplication;
+use \Tekton\Framework as BaseFramework;
 
-class Application extends BaseApplication {
+class Framework extends BaseFramework {
 
     function __construct() {
         parent::__construct();
+        
+        $this->container->instance('wp.framework', $this);
 
         if ( ! defined('TEKTON_WP_VERSION'))
             define('TEKTON_WP_VERSION', '1.0.0');
