@@ -41,12 +41,6 @@ class Image extends Attachment
         // If it's an image not from the database
         if ($this->isLocal()) {
             if (! $alt_versions) {
-                // Verify that the file actually exists
-                if (empty($this->pathAbs)) {
-                    $this->set('url', false);
-                    return;
-                }
-
                 // Save image dimensions
                 list($width, $height) = getimagesize($this->pathAbs);
 
@@ -70,8 +64,8 @@ class Image extends Attachment
                 // The paths needs to be set with the real path since the name
                 // supplied might have been a path without scale suffix that
                 // doesn't actually exist
-                $this->pathAbs = realpath($largest);
-                $this->pathRel = rel_path($this->pathAbs, get_path('theme'));
+                $this->pathAbs = canonicalize($largest);
+                $this->pathRel = rel_path($this->pathAbs, get_path('public'));
                 $this->set('url', $url = make_url($this->pathAbs));
 
                 // Retrieve the alternate sizes from cache

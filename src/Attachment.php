@@ -24,6 +24,7 @@ class Attachment implements ValidityChecking, SimpleStore
             $this->id = (int) $object;
             $meta = wp_prepare_attachment_for_js($this->id);
         }
+        // Only supporting absolute paths
         else {
             $this->id = 0;
             $this->set('url', $object);
@@ -53,13 +54,19 @@ class Attachment implements ValidityChecking, SimpleStore
                 $this->local = true;
 
                 if (is_url($url)) {
-                    $this->pathAbs = make_path($url);
-                    $this->pathRel = rel_path($this->pathAbs, get_path('theme'));
+                    $this->pathAbs = make_path(canonicalize($url));
+                    $this->pathRel = rel_path($this->pathAbs, get_path('public'));
                 }
                 else {
-                    $this->pathAbs = realpath($url);
-                    $this->pathRel = rel_path($this->pathAbs, get_path('theme'));
+                    $this->pathAbs = canonicalize($url);
+                    $this->pathRel = rel_path($this->pathAbs, get_path('public'));
                     $this->set('url', make_url($this->pathAbs));
+                }
+
+                // Verify that the file actually exists
+                if (! file_exists($this->pathAbs)) {
+                    $this->pathAbs = null;
+                    $this->set('url', null);
                 }
             }
         }

@@ -601,23 +601,25 @@ function path_to_url($path) {
         return $path;
     }
 
-    $abs = realpath($path);
+    $abs = canonicalize($path);
 
     // Find out what directory the path is pointing to so that we can get the
     // relative path correctly no matter the wordpress configuration. Start with
-    // what we assume is the top common denominator. Theme is always in wp-content
-    // we don't need to handle it separately as in url_to_path.
-    if (starts_with($abs, $public = get_path('public'))) {
-        return get_uri('public').'/'.rel_path($abs, $public);
-    }
-    if (starts_with($abs, $content = get_path('content'))) {
-        return get_uri('content').'/'.rel_path($abs, $content);
+    // what we assume is the bottom common denominator.
+    if (starts_with($abs, $theme = get_path('theme'))) {
+        return get_uri('theme').'/'.rel_path($abs, $theme);
     }
     if (starts_with($abs, $plugin = get_path('plugin'))) {
         return get_uri('plugin').'/'.rel_path($abs, $plugin);
     }
     if (starts_with($abs, $upload = get_path('upload'))) {
         return get_uri('upload').'/'.rel_path($abs, $upload);
+    }
+    if (starts_with($abs, $content = get_path('content'))) {
+        return get_uri('content').'/'.rel_path($abs, $content);
+    }
+    if (starts_with($abs, $public = get_path('public'))) {
+        return get_uri('public').'/'.rel_path($abs, $public);
     }
 
     return $abs;
@@ -631,7 +633,7 @@ function url_to_path($url) {
 
     // Find out what directory the url is pointing to so that we can get the
     // relative url correctly no matter the wordpress configuration. Start with
-    // what we assume is the bottom common denominator (Opposite from path_to_url)
+    // what we assume is the bottom common denominator.
     if (starts_with($url, $theme = get_uri('theme'))) {
         return get_path('theme').DS.rel_path($url, $theme);
     }
