@@ -1,16 +1,180 @@
 <?php
 
-/**
- * @param string $file
- * @param array $data
- * @return string
- */
-if (! function_exists('template'))
+function get_url_by_template($template)
 {
+    $id = get_id_by_template($template);
+    return ($id) ? get_permalink($id) : '#';
+}
+
+function option($key = null, $default = null)
+{
+    if (is_null($key)) {
+        return app('options')->all();
+    }
+    else {
+        return app('options')->get($key, $default);
+    }
+}
+
+function have_pages($query = null)
+{
+    if (is_null($query)) {
+        $query = current_query();
+    }
+
+    if (! is_null($query)) {
+        if ($query->is_page) {
+            global $pages;
+            return (count($pages ?: []) > 1) ? true : false;
+        }
+        else {
+            return (($query->max_num_pages ?: 1) > 1) ? true : false;
+        }
+    }
+
+    return false;
+}
+
+function get_posts_per_page($post_type, $posts_per_page = null, $taxonomy = null, $term = null)
+{
+    // Get posts_per_page
+    if (is_null($posts_per_page)) {
+        $posts_per_page = get_option('posts_per_page');
+    }
+
+    // Get number of post types from global filter
+    $posts_per_page = apply_filters('pagination_posts_per_page', $posts_per_page, $post_type, $taxonomy, $term);
+
+    // Sometimes taxonomy queries are without post type so we only run post type
+    // specific filter when we know we got one
+    if (! is_null($post_type)) {
+        $posts_per_page = apply_filters('pagination_posts_per_page_'.$post_type, $posts_per_page, $taxonomy, $term);
+    }
+
+    return $posts_per_page;
+}
+
+function get_pagination_url($query, $pageNumber)
+{
+    if ($query->is_page) {
+        $link = _wp_link_page($pageNumber);
+        $anchor = new \SimpleXMLElement($link.'</a>');
+        $url = $anchor['href'];
+    }
+    else {
+        $url = get_pagenum_link($pageNumber);
+    }
+
+    return apply_filters('pagination_page_url', $url, $pageNumber, $query);
+}
+
+function get_pagination($query = null)
+{
+    if (is_null($query)) {
+        $query = current_query();
+    }
+
+    if (! is_null($query)) {
+        if ($query->is_page) {
+            global $pages, $page;
+            $maxPages = count($pages);
+        }
+        else {
+            $maxPages = $query->max_num_pages ?: 1;
+            $page = $query->get('paged') ?: 1;
+        }
+
+        $output = apply_filters('pagination_markup', '', $maxPages, $page, $query);
+
+        if (empty($output)) {
+            if ($query->is_page) {
+                return wp_link_pages(['echo' => false]);
+            }
+            else {
+                return get_the_posts_pagination();
+            }
+        }
+        else {
+            return $output;
+        }
+    }
+
+    return null;
+}
+
+function query($args = null, $paginate = false)
+{
+    if ($args instanceof \WP_Query) {
+        // We have to re-run get_posts if we're inserting the global pagination
+        // into it otherwise paged has no effect
+        if ($paginate && ! $args->get('nopaging') && ($paged = get_query_var('paged')) != $args->get('paged')) {
+            $args->set('paged', $paged ?: 1);
+            $args->get_posts();
+        }
+
+        return $args;
+    }
+    elseif (is_null($args)) {
+        // Already main query
+        global $wp_query;
+        return $wp_query;
+    }
+    elseif (is_array($args)) {
+        // Set paged from main query
+        if ($paginate && ! ($args['nopaging'] ?? false) && ! array_key_exists('paged', $args)) {
+            $args['paged'] = get_query_var('paged') ?: 1;
+        }
+
+        return new \WP_Query($args);
+    }
+
+    return null;
+}
+
+function get_all_post_types($filter = [])
+{
+    $postTypes = get_post_types(['public' => true], 'names', 'and');
+
+    foreach ($postTypes as $key => $value) {
+        if (in_array($value, $filter)) {
+            unset($postTypes[$key]);
+        }
+    }
+
+    return $postTypes;
+}
+
+function get_custom_post_types($filter = [])
+{
+    $postTypes = get_post_types(['public' => true, '_builtin' => false], 'names', 'and');
+
+    foreach ($postTypes as $key => $value) {
+        if (in_array($value, $filter)) {
+            unset($postTypes[$key]);
+        }
+    }
+
+    return $postTypes;
+}
+
+if (! function_exists('template')) {
     function template($file, $data = [])
     {
         return app('blade')->render($file, $data);
     }
+}
+
+function is_post($post = '')
+{
+    if (empty($post)) {
+        $post = current_post();
+    }
+
+    if (! is_null($post)) {
+        return (is_page($post) || is_single($post)) ? true : false;
+    }
+
+    return false;
 }
 
 /**
@@ -35,39 +199,31 @@ if (! function_exists('template_path'))
     }
 }
 
-if (! function_exists('includeFile'))
-{
-    function includeFile($file)
-    {
-        include $file;
-    }
-}
-
 if (! function_exists('asset_path'))
 {
-    function asset_path($file)
+    function asset_path($file, $resolve = true)
     {
-        return get_path('cwd').DS.asset($file);
+        return theme_path(($resolve) ? asset($file) : $file);
     }
 }
 
 if (! function_exists('asset_url'))
 {
-    function asset_url($file)
+    function asset_url($file, $resolve = true)
     {
-        return get_site_url(null, asset($file));
+        return theme_url(($resolve) ? asset($file) : $file);
     }
 }
 
 // Check if current post is the supplied id
-if (! function_exists('post_is'))
+if (! function_exists('current_post_is'))
 {
-    function post_is($check)
+    function current_post_is($check)
     {
         $post = current_post();
 
-        if ( ! is_numeric($check)) {
-            if ($check instanceof \Tekton\Wordpress\Post) {
+        if (! is_numeric($check)) {
+            if ($check instanceof \Dynamis\Post) {
                 $check = $check->id;
             }
             elseif ($check instanceof \WP_Post){
@@ -75,7 +231,7 @@ if (! function_exists('post_is'))
             }
         }
 
-        if ( ! is_null($post) && $check == $post->ID) {
+        if (! is_null($post) && $check == $post->ID) {
             return true;
         }
 
@@ -141,19 +297,16 @@ function get_template_name($id = null) {
 
 // Helper to get current post id in more than just the loop
 if ( ! function_exists('current_post')) {
-    function current_post() {
+    function current_post($powerup = false) {
         global $post;
 
         if ($post) {
-            return $post;
+            return ($powerup) ? post($post) : $post;
         }
         else {
             // Get the Post ID.
-            $post_id = (isset($_GET['post'])) ? $_GET['post'] : null;
-            $post_id = (isset($_POST['post_ID'])) ? $_POST['post_ID'] : $post_id;
-
-            if ( ! is_null($post_id)) {
-                return get_post($post_id);
+            if (! is_null($post_id = current_post_id())) {
+                return ($powerup) ? post($post_id) : get_post($post_id);
             }
         }
 
@@ -161,30 +314,58 @@ if ( ! function_exists('current_post')) {
     }
 }
 
-// Convert a relative theme url to absolute
-function theme_url($uri) {
-    return get_uri('theme').DS.$uri;
+// Helper to get current post id in more than just the loop
+if ( ! function_exists('current_post_id')) {
+    function current_post_id() {
+        global $post;
+
+        if ($post) {
+            return $post->ID;
+        }
+        else {
+            // Get the Post ID.
+            $post_id = (isset($_GET['post'])) ? $_GET['post'] : null;
+            $post_id = (isset($_POST['post_ID'])) ? $_POST['post_ID'] : $post_id;
+
+            if ( ! is_null($post_id)) {
+                return $post_id;
+            }
+        }
+
+        return null;
+    }
 }
 
-// Convert a relative theme path to absolute
-function theme_path($uri) {
-    return get_path('theme').DS.$uri;
+// Helper to get current post id in more than just the loop
+if (! function_exists('current_query')) {
+    function current_query() {
+        global $wp_query;
+
+        if ($wp_query) {
+            return $wp_query;
+        }
+
+        return null;
+    }
+}
+
+// Convert a relative theme uri to absolute url
+function theme_url($uri = '') {
+    return ($uri) ? get_uri('theme').DS.$uri : get_uri('theme');
+}
+
+// Convert a relative theme uri to absolute path
+function theme_path($uri = '') {
+    return ($uri) ? get_path('theme').DS.$uri : get_path('theme');
 }
 
 // Convert an absolute path to a relative
 function theme_rel_path($uri) {
-    $uri = str_replace(get_path('theme'), '', $uri);
-    return ($uri[0] == '/') ? substr($uri, 1, strlen($uri)) : $uri;
-}
-
-// Convert an absolute path to a relative
-function cwd_rel_path($uri) {
-    $uri = str_replace(get_path('cwd'), '', $uri);
-    return ($uri[0] == '/') ? substr($uri, 1, strlen($uri)) : $uri;
+    return rel_path($uri, get_path('theme'));
 }
 
 // Retrieve the page title
-function page_title() {
+function get_page_title($post = null) {
     if (is_home()) {
         if (get_option('page_for_posts', true)) {
             return get_the_title(get_option('page_for_posts', true));
@@ -203,7 +384,7 @@ function page_title() {
         return __('Not Found', 'tekton-wp');
     }
     else {
-        return get_the_title();
+        return get_the_title($post);
     }
 }
 
@@ -244,7 +425,7 @@ function type_is($type) {
         }
     }
     else {
-        if ( ! is_null($post) && $post->post_type == $type) {
+        if (! is_null($post) && $post->post_type == $type) {
             return true;
         }
     }
@@ -252,34 +433,20 @@ function type_is($type) {
     return false;
 }
 
-
-// Wrapper for CMB2
-function create_metabox($args, $cmb_styles = true) {
-    $args['cmb_styles'] = $cmb_styles;
-    return new_cmb2_box($args);
-}
-
-// Wrapper for CMB2-grid
-function create_grid($args) {
-    return new \Cmb2Grid\Grid\Cmb2Grid($args);
-}
-
-// Wrapper for CMB2
-function create_group_grid(&$grid, $group_id) {
-    return $grid->addCmb2GroupGrid($group_id);
-}
-
-// Get meta key
-function meta_key($group, $key = '') {
-    return THEME_PREFIX.$group.(!empty($key) ? '_'.$key : '');
-}
-
-function image($id = null, $size = 'large', $attr = array()) {
+function image($id = null, $alt_versions = false) {
+    // Make sure something has been provided
     if (is_null($id)) {
-        $id = get_the_ID();
+        return null;
     }
 
-    return new \Tekton\Wordpress\Image($id);
+    if ($id instanceof \Dynamis\Image) {
+        $image = $id;
+    }
+    else {
+        $image = new \Dynamis\Image($id, $alt_versions);
+    }
+
+    return ($image->isValid()) ? $image : null;
 }
 
 function get_page_by_slug($slug) {
@@ -324,25 +491,217 @@ function is_admin_edit($slug = null) {
     return false;
 }
 
-function __post($object = null) {
+function post($object = null)
+{
+    // Get post however the function was called
     if ($object instanceof \WP_Query) {
         $object->the_post();
         global $post;
+        $_post = $post;
+    }
+    elseif ($object instanceof \WP_Post) {
+        $_post = $object;
     }
     elseif (is_numeric($object)) {
-        $post = get_post((int) $object);
+        $_post = get_post((int) $object);
     }
     else {
-        the_post();
-        global $post;
+        $_post = current_post();
     }
 
-    $post_hijacks = apply_filters('automatic_post_objects', ['post' => Post::class, 'page' => Post::class]);
-    $type = $post->post_type;
+    // Abort if can't find a post
+    if (is_null($_post)) {
+        return null;
+    }
+
+    // Convert post into an object
+    $post_hijacks = apply_filters('automatic_post_objects', [
+        'post' => \Dynamis\Post::class,
+        'page' => \Dynamis\Post::class,
+        'attachment' => \Dynamis\Attachment::class,
+    ]);
+
+    $type = $_post->post_type;
 
     if (in_array($type, array_keys($post_hijacks))) {
-        return new $post_hijacks[$type]($post);
+        $_post = new $post_hijacks[$type]($_post);
+    }
+    else {
+        $_post = new \Dynamis\Post($_post);
     }
 
-    return $post;
+    return $_post;
+}
+
+function term($object)
+{
+    return new \Dynamis\Term($object);
+}
+
+function current_term($powerup = false)
+{
+    $id = get_queried_object()->term_id ?? null;
+
+    if (! is_null($id)) {
+        return ($powerup) ? new \Dynamis\Term($id) : get_term($id);
+    }
+
+    return null;
+}
+
+function get_all_image_sizes() {
+    return app('cache')->rememberForever('image_sizes', function() {
+        global $_wp_additional_image_sizes;
+
+        $image_sizes = [];
+        $default_image_sizes = ['thumbnail', 'medium', 'large'];
+
+        foreach ($default_image_sizes as $size) {
+            $image_sizes[$size] = [
+                'width'  => intval(get_option("{$size}_size_w")),
+                'height' => intval(get_option("{$size}_size_h")),
+                'crop'   => get_option("{$size}_crop") ? get_option("{$size}_crop") : false,
+            ];
+        }
+
+        if (isset($_wp_additional_image_sizes) && count($_wp_additional_image_sizes)) {
+            $image_sizes = array_merge($image_sizes, $_wp_additional_image_sizes);
+        }
+
+        // Sort on width - ascending order
+        array_multisort(array_column($image_sizes, 'width'), SORT_ASC, $image_sizes);
+        return $image_sizes;
+    });
+}
+
+function is_theme_asset($uri) {
+    if (starts_with($uri, get_uri('theme'))) {
+        return true;
+    }
+    elseif (starts_with($uri, get_path('theme'))) {
+        return true;
+    }
+
+    return false;
+}
+
+function is_local_file($uri) {
+    if (starts_with($uri, home_url()) && $uri != home_url()) {
+        return true;
+    }
+    elseif (starts_with($uri, ABSPATH) && $uri != ABSPATH) {
+        return true;
+    }
+
+    return false;
+}
+
+function path_to_url($path) {
+    if (is_url($path)) {
+        return $path;
+    }
+
+    $abs = realpath($path);
+
+    // Find out what directory the path is pointing to so that we can get the
+    // relative path correctly no matter the wordpress configuration. Start with
+    // what we assume is the top common denominator. Theme is always in wp-content
+    // we don't need to handle it separately as in url_to_path.
+    if (starts_with($abs, $public = get_path('public'))) {
+        return get_uri('public').'/'.rel_path($abs, $public);
+    }
+    if (starts_with($abs, $content = get_path('content'))) {
+        return get_uri('content').'/'.rel_path($abs, $content);
+    }
+    if (starts_with($abs, $plugin = get_path('plugin'))) {
+        return get_uri('plugin').'/'.rel_path($abs, $plugin);
+    }
+    if (starts_with($abs, $upload = get_path('upload'))) {
+        return get_uri('upload').'/'.rel_path($abs, $upload);
+    }
+
+    return $abs;
+}
+
+// This one is not perfect and can get messed up from mod rewrites
+function url_to_path($url) {
+    if (! is_url($url)) {
+        return $url;
+    }
+
+    // Find out what directory the url is pointing to so that we can get the
+    // relative url correctly no matter the wordpress configuration. Start with
+    // what we assume is the bottom common denominator (Opposite from path_to_url)
+    if (starts_with($url, $theme = get_uri('theme'))) {
+        return get_path('theme').DS.rel_path($url, $theme);
+    }
+    if (starts_with($url, $upload = get_uri('upload'))) {
+        return get_path('upload').DS.rel_path($url, $upload);
+    }
+    if (starts_with($url, $plugin = get_uri('plugin'))) {
+        return get_path('plugin').DS.rel_path($url, $plugin);
+    }
+    if (starts_with($url, $content = get_uri('content'))) {
+        return get_path('content').DS.rel_path($url, $content);
+    }
+    if (starts_with($url, $public = get_uri('public'))) {
+        return get_path('public').DS.rel_path($url, $public);
+    }
+
+    return $url;
+}
+
+function make_path($url) {
+    if (! is_url($url)) {
+        return $url;
+    }
+
+    return url_to_path($url);
+}
+
+function make_url($path) {
+    if (is_url($path)) {
+        return $path;
+    }
+
+    return path_to_url($path);
+}
+
+function component($name, $data = []) {
+    return \Tekton\Components\Facades\Components::include($name, $data);
+}
+
+function post_meta($key, $id = null) {
+    if (! is_numeric($id)) {
+        if (is_null($id)) {
+            $id = current_post_id();
+        }
+        elseif ($id instanceof \WP_Post) {
+            $id = $id->ID;
+        }
+        elseif ($id instanceof \Dynamis\Post) {
+            $id = $id->getId();
+        }
+        else {
+            return null;
+        }
+    }
+
+    return get_post_meta(intval($id), $key, true);
+}
+
+function term_meta($key, $id) {
+    if (! is_numeric($id)) {
+        if ($id instanceof \WP_Term) {
+            $id = $id->ID;
+        }
+        elseif ($id instanceof \Dynamis\Term) {
+            $id = $id->getId();
+        }
+        else {
+            return null;
+        }
+    }
+
+    return get_term_meta(intval($id), $key, true);
 }

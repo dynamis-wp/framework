@@ -1,11 +1,11 @@
 {
-    "name": "tekton/wordpress",
+    "name": "dynamis/framework",
     "license": "MIT",
-    "description": "Tekton Wordpress is a lightweight PHP framework that integrates the power of Laravel, through Tekton, into Wordpress.",
-    "homepage": "https://gitlab.com/tekton/wordpress",
+    "description": "Dynamis is a lightweight component based PHP framework that integrates a modern workflow, through Tekton, into Wordpress.",
+    "homepage": "https://github.com/dynamis-wp/framework",
     "autoload": {
         "psr-4": {
-            "Tekton\\Wordpress\\": "src/"
+            "Dynamis\\": "src/"
         },
         "files": [
             "src/helpers.php"
@@ -15,30 +15,15 @@
     "require": {
         "php": ">=7.0.0",
         "composer/installers": "~1.0",
-        "tekton/foundation": "^1.0.0",
-        "tekton/assets": "^1.0.0",
-        "tekton/support": "^1.0.0",
+        "tekton/framework": "^2.0.0",
+        "tekton/assets": "^2.0.0",
+        "tekton/support": "^2.0.0",
+        "tekton/session": "^2.0.0",
+        "tekton/components": "^1.0.0",
         "illuminate/view": "~5.4.0",
         "illuminate/contracts": "~5.4.0",
-        "nsrosenqvist/blade-compiler": "^1.1.1",
-        "jjgrainger/posttypes": "^1.0",
-
-        "wpackagist-plugin/cmb2": "2.2.4",
-        "origgami/cmb2-grid": "@dev",
-        "webdevstudios/cmb2-post-search-field": "0.2.5"
-    },
-    "repositories": [
-        {
-            "type": "composer",
-            "url": "https://wpackagist.org"
-        },
-        {
-            "type": "git",
-            "url": "https://github.com/nsrosenqvist/CMB2-grid"
-        },
-        {
-            "type": "git",
-            "url": "https://github.com/WebDevStudios/CMB2-Post-Search-field"
-        }
-    ]
+        "nsrosenqvist/blade-compiler": "^1.3.0",
+        "intervention/image": "^2.4.1",
+        "rarst/wps": "^1.1"
+    }
 }

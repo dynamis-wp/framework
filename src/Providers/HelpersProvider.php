@@ -1,89 +1,109 @@
-<?php namespace Tekton\Wordpress\Providers;
+<?php namespace Dynamis\Providers;
 
-use Tekton\Support\ServiceProvider;
-use Tekton\Wordpress\Post;
+use Dynamis\ServiceProvider;
+use Dynamis\Post;
 
-class HelpersProvider extends ServiceProvider {
+class HelpersProvider extends ServiceProvider
+{
+    function boot()
+    {
+        // Add helper action that triggers on both save and delete
+        add_action('save_post', function($id) {
+            do_action('change_post', $id);
+        });
+        add_action('delete_post', function($id) {
+            do_action('change_post', $id);
+        });
 
-    function register() {
-        $this->app->register(\Tekton\Wordpress\Meta\Providers\MetaProvider::class);
-    }
-
-    function boot() {
-        add_action('save_post', function() {
+        // Clear cache that's been set by helper functions
+        add_action('change_post', function($id) {
             app('cache')->forget('template_ids');
+            app('cache')->forget('image_sizes');
         });
 
-        add_action('the_post', function($post_object) {
-            $post_hijacks = apply_filters('automatic_post_objects', ['post' => Post::class, 'page' => Post::class]);
-            $type = $post_object->post_type;
+        // This hook is to apply the filter 'pagination_posts_per_page' to the main
+        // query in order to fix custom queries causing 404's
+        add_action('pre_get_posts', function($query) {
+            if ($query->is_main_query() && ! $query->is_page) {
+                $posts_per_page = $query->get('posts_per_page') ?: null;
+                $post_type = $query->get('post_type') ?: null;
 
-            if (in_array($type, array_keys($post_hijacks))) {
-                return new $post_hijacks[$type]($post_object);
+                // Set taxonomy and term it's a taxonomy
+                if ($query->is_tax) {
+                    $object = get_queried_object();
+                    $taxonomy = $object->taxonomy;
+                    $term = $object->slug;
+                }
+                else {
+                    $taxonomy = $term = null;
+                }
+
+                // Set posts_per_page
+                if (! $query->get('nopaging')) {
+                    $query->set('posts_per_page', get_posts_per_page($post_type, $posts_per_page, $taxonomy, $term));
+                }
+                else {
+                    $query->set('posts_per_page', -1);
+                }
             }
+        }, 5);
 
-            return $post_object;
-        });
-
-        add_action('template_redirect', function () {
+        // Enable force_ssl filter
+        add_action('template_redirect', function() {
             if (is_ssl() || WP_DEBUG) {
-                return null;
+                return;
             }
 
             if (apply_filters('force_ssl', false)) {
-                $ssl_url = str_replace('http://','https://',get_the_permalink());
+                $ssl_url = str_replace('http://', 'https://', get_the_permalink());
                 wp_redirect($ssl_url);
                 exit;
             }
-
-            return null;
         });
 
-        // Start Session, now defined as an alias
-        if (apply_filters('session_start', false)) {
-            app('session')->session()->start();
-        }
+        // Add global js variables
+        add_action('wp_head', function() {
+            echo PHP_EOL.'<script type="text/javascript">'.PHP_EOL;
 
-        // Wrap CMB2
-        add_action('cmb2_admin_init', function() {
-            do_action('metabox_init');
+            foreach (apply_filters('global_js_variables', []) as $name => $vars) {
+                echo 'var '.$name.' = '.json_encode($vars).';'.PHP_EOL;
+            }
+
+            echo '</script>'.PHP_EOL;
         });
 
-        // CMB2 Show on slug filter
-        add_filter('cmb2_show_on', function($display, $meta_box) {
-            if ( ! isset( $meta_box['show_on']['key'], $meta_box['show_on']['value'] ) ) {
-                return $display;
+        // Add global js variables
+        add_action('admin_head', function() {
+            echo PHP_EOL.'<script type="text/javascript">'.PHP_EOL;
+
+            foreach (apply_filters('admin_global_js_variables', []) as $name => $vars) {
+                echo 'var '.$name.' = '.json_encode($vars).';'.PHP_EOL;
             }
 
-            if ( 'slug' !== $meta_box['show_on']['key'] ) {
-                return $display;
+            echo '</script>'.PHP_EOL;
+        });
+
+        // Start Session
+        add_action('wp', function() {
+            if (apply_filters('session_start', false)) {
+                $session = app('session')->session();
+
+                if (! $session->isStarted()) {
+                    $session->start();
+                }
+                else {
+                    $session->resume();
+                }
             }
-
-            $post = current_post();
-
-            if (is_null($post)) {
-                return $display;
-            }
-
-            $slug = $post->post_name;
-
-            // See if there's a match
-            return in_array($slug, (array) $meta_box['show_on']['value']);
-        }, 10, 2 );
-
+        }, PHP_INT_MAX);
 
         // Improve body classes
         add_filter('body_class', function($classes) {
             // Add page slug if it doesn't exist
-            if (is_single() || is_page() && !is_front_page()) {
-                if (!in_array(basename(get_permalink()), $classes)) {
+            if (is_single() || is_page() && ! is_front_page()) {
+                if (! in_array(basename(get_permalink()), $classes)) {
                     $classes[] = basename(get_permalink());
                 }
-            }
-
-            // Add class if sidebar is active
-            if (display_sidebar()) {
-                $classes[] = 'sidebar-primary';
             }
 
             return $classes;
@@ -91,12 +111,12 @@ class HelpersProvider extends ServiceProvider {
 
         // Clean up excerpt read more text
         add_filter('excerpt_more', function() {
-            return ' &hellip; <a href="' . get_permalink() . '">' . __('Continued', 'tekton-wp') . '</a>';
+            return ' &hellip; <a href="'.get_permalink().'">'.__('Continued', 'dynamis').'</a>';
         });
 
         // Improve Archive Titles
-        add_filter( 'get_the_archive_title', function ($title) {
-            if ( is_category() ) {
+        add_filter('get_the_archive_title', function($title) {
+            if (is_category()) {
                 return single_cat_title('', false);
             }
             if (is_tag()) {

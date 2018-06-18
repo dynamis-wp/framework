@@ -1,25 +1,49 @@
-Tekton Wordpress
-================
+Dynamis Wordpress Framework
+===========================
 
-Tekton Wordpress is a lightweight PHP framework that integrates the power of Laravel, through [Tekton](https://gitlab.com/tekton/foundation), into Wordpress.
+Dynamis is a lightweight component base PHP framework that integrates a modern development workflow, through [Tekton](https://github.com/tekton-php/framework), into Wordpress.
 
 To get started, just require the project in your composer configuration and initialize the framework. Put the following sample code into your theme's `functions.php` to get it set up.
 
 **Sample Code**
 ```php
+
+// Not required but used by Tekton date helpers
+define('DATE_FORMAT', 'M j, Y');
+
+/* ------------------------------ */
+
 // Autoload classes
 require_once __DIR__ . '/vendor/autoload.php';
 
-use \Tekton\Wordpress\Framework;
+// Create framework
+$framework = \Dynamis\Framework::getInstance();
 
-// Theme constants
-define('THEME_PREFIX', '_mytheme_');
-define('DATE_FORMAT', 'M j, Y');
+// Configure environment
+if ($stage = getenv('APP_STAGE')) {
+    $framework->setEnvironment($stage);
+}
+else {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        $framework->setEnvironment('development');
+    }
+    else {
+        $framework->setEnvironment('production');
+    }
+}
 
-Framework::instance()->init();
+// Initialize
+$framework->init();
 ```
 
-## Features
-The framework integrates Laravel's Blade templating engine and moves the base template folder into the `[theme-path]/templates` sub directory.
+All configuration files will be loaded from `[theme-path]/config` but it can and should be be manually overridden to avoid having the config in a public directory:
 
-All configuration files should be put in `[theme-path]/config` and any bootstrapping code for the theme can be put in `[theme-path]/bootstrap` from where it will be automatically loaded.
+```php
+$framework->overridePath('config', 'path/to/theme/config')
+```
+
+# Documentation
+The documentation and tutorials for the framework can be found here.
+
+# License
+MIT

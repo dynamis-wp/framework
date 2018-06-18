@@ -1,17 +1,25 @@
-<?php namespace Tekton\Wordpress\Providers;
+<?php namespace Dynamis\Providers;
 
-use \Tekton\Support\ServiceProvider;
-use \Tekton\Wordpress\Options;
+use Dynamis\OptionsRepository;
+use Dynamis\ServiceProvider;
 
-class OptionsProvider extends ServiceProvider {
+class OptionsProvider extends ServiceProvider
+{
+    function provides()
+    {
+        return ['options'];
+    }
 
-    function register() {
-        $this->app->singleton('wp.options', function () {
-            return new Options();
+    function register()
+    {
+        $this->app->singleton('options', function($app) {
+            return new OptionsRepository();
         });
     }
 
-    function boot() {
-
+    function boot()
+    {
+        // Share options to blade
+        app('blade')->share('options', app('options'));
     }
 }

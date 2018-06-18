@@ -1,94 +1,145 @@
-<?php namespace Tekton\Wordpress;
+<?php namespace Dynamis;
 
 use WP_Post;
-use Tekton\Wordpress\Image;
+use WP_Error;
+use BadMethodCallException;
+use InvalidArgumentException;
+use Dynamis\Image;
 use Tekton\Support\SmartObject;
+use Dynamis\Author;
 use Tekton\Support\Contracts\ValidityChecking;
 
-class Post extends SmartObject implements ValidityChecking {
-
+class Post extends SmartObject implements ValidityChecking
+{
     protected $post;
-    public $id;
+    protected $id;
+    protected $meta = [];
 
-    function __construct($object) {
+    // Index = "Property", Value (array) = aliases
+    protected $aliases = [
+        'date' => ['published'],
+        'content' => ['post_content'],
+        'author' => ['post_author'],
+        'image' => ['featured_image'],
+    ];
+
+    public function __construct($object)
+    {
+        // Set $id and $post whatever way the object is created
+
+        // Created with a regular WP_Post
         if ($object instanceof WP_Post) {
             $this->id = (int) $object->ID;
             $this->post = $object;
         }
+        // Created with a previous or subclass instance of this class
         elseif ($object instanceof Post) {
-            $this->id = $object->id;
-            $this->post = $object;
+            $this->id = $object->getId();
+            $this->post = $object->getPost();;
         }
-        else {
+        // Created with ID
+        elseif (is_numeric($object)) {
             $this->id = (int) $object;
             $this->post = get_post($this->id);
         }
-    }
-
-    function get_property($key) {
-        // setup_postdata($this->post);
-
-        switch ($key) {
-            case 'title': $result = get_the_title($this->post); break;
-            case 'url': $result = get_permalink($this->post); break;
-            case 'content': $result = do_shortcode(wpautop(get_post_field('post_content', $this->post))); break;
-            case 'excerpt': $result = $this->excerpt(); break; // $result = get_the_excerpt($this->post); break;
-            case 'author': $result = get_the_author_meta('display_name', get_post_field('post_author', $this->post)); break;
-            case 'category_links': $result = explode('|||', get_the_category_list('|||', '', $this->id)); break;
-            case 'category': $result = get_the_category($this->id); break;
-            case 'published':
-            case 'date': $result = make_datetime(get_the_date(DATE_ISO, $this->post), DATE_ISO); break;
-            case 'updated': $result = make_datetime(get_the_modified_date(DATE_ISO, $this->post), DATE_ISO); break;
-            case 'image': $result = image(get_post_thumbnail_id($this->post)); break;
-            case 'type': $result = get_post_type($this->post); break;
-            case 'short_url': $result = post_meta('global', 'short_url', $this->id); break;
-            case 'meta_keywords': $result = post_meta('meta', 'keywords', $this->id); break;
-            case 'meta_description': $result = post_meta('meta', 'description', $this->id); break;
-            default: $result = null;
+        else {
+            $msg = get_class($this)." can only be created with either a WP_Post, an instance of ".self::class." or a post id. ";
+            $msg .= "Attempted to create an instance by supplying ".(is_null($object) ? 'NULL' : 'a '.get_class($object));
+            throw new InvalidArgumentException($msg);
         }
 
-        // wp_reset_postdata();
+        // Enable automatic lookup of post meta data
+        if ($this->isValid()) {
+            $this->meta = get_post_meta($this->getId());
+        }
+    }
 
-        if ( ! empty($result)) {
+    public function getPost()
+    {
+        return $this->post;
+    }
+
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    public function retrieveProperty($key = null)
+    {
+        $key = $key ?? 'content';
+
+        // Enable user defined extra or overridden fields
+        if (! is_null($result = apply_filters('post_properties', null, $key, $this))) {
             return $result;
         }
 
-        return parent::get_property($key);
+        // If the key refers to meta we can retrieve it
+        if (isset($this->meta[$key])) {
+            return maybe_unserialize((count($this->meta[$key]) > 1) ? $this->meta[$key] : reset($this->meta[$key]));
+        }
+
+        // Process normal keys
+        switch ($key) {
+            case 'title': return get_the_title($this->post);
+            case 'url': return get_permalink($this->post);
+            case 'content': return $this->getContent();
+            case 'raw': return $this->post->post_content;
+            case 'template': return get_template_name($this->id);
+            case 'revision': return wp_is_post_revision($this->id);
+            case 'password_protected': return post_password_required($this->post);
+            case 'excerpt': return apply_filters('the_excerpt', get_the_excerpt($this->post));
+            case 'author': return new Author(get_post_field('post_author', $this->post));
+            case 'category_links': return explode('|||', get_the_category_list('|||', '', $this->id));
+            case 'category': return get_the_category($this->id);
+            case 'date': return make_datetime(get_the_date(DATE_ISO, $this->post), DATE_ISO);
+            case 'updated': return make_datetime(get_the_modified_date(DATE_ISO, $this->post), DATE_ISO);
+            case 'image': return image(get_post_thumbnail_id($this->post));
+            case 'type': return get_post_type($this->post);
+        }
+
+        return null;
     }
 
-    /**
-     * Used because of bugs with the wordpress excerpt function
-     * @return [type] [description]
-     */
-    protected function excerpt() {
-        if ( ! empty($this->post->post_excerpt)) {
-            return $this->post->post_excerpt;
-        }
-        else {
-            return wp_trim_words($this->post->post_content, '50');
-        }
+    public function getContent($more_link_text = null, $strip_teaser = false)
+    {
+        // get_the_content only works with global $post
+        setup_postdata($this->post);
+
+        $content = get_the_content($more_link_text, $strip_teaser);
+        $content = apply_filters('the_content', $content);
+
+        // Reset postdata
+        wp_reset_postdata();
+
+        return $content;
     }
 
-    function has_excerpt() {
-        return ! empty($this->post->post_excerpt);
+    public function exists(string $key)
+    {
+        // Check first this instance and then the original WP_Post
+        return parent::exists($key) ?: isset($this->post->{$key});
     }
 
-    function has_image() {
-        $image = $this->image;
+    public function get(string $key, $default = '')
+    {
+        // First check our retrieved data, then the original post object
+        return parent::get($key, null) ?? $this->post->{$key} ?? $default;
+    }
 
-        if ($image instanceof Image && $image->is_valid()) {
-            return true;
-        }
-        else {
+    // Can be invoked as a shorthand for get
+    function __invoke($key = null, $default = '')
+    {
+        return parent::__invoke($key, $default);
+    }
+
+    public function isValid()
+    {
+        // If WP_Post is an error then we know it wasn't successful in retrieving the post
+        if (! $this->post instanceof WP_Post) {
             return false;
         }
-    }
 
-    function is_image() {
-        return $this->has_image();
-    }
-
-    function is_valid() {
-        return ($this->id) ? true : false;
+        // Determine if it's a valid post depending on if the ID is set or not
+        return ($this->getId()) ? true : false;
     }
 }

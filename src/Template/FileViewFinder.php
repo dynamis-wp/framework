@@ -1,4 +1,4 @@
-<?php namespace Tekton\Wordpress\Template;
+<?php namespace Dynamis\Template;
 
 use Illuminate\View\FileViewFinder as BaseFinder;
 use Illuminate\View\ViewFinderInterface;

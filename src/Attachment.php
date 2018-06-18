@@ -1,79 +1,134 @@
-<?php namespace Tekton\Wordpress;
+<?php namespace Dynamis;
 
-use Tekton\Support\SmartObject;
-use Tekton\Support\Contracts\UndefinedPropertyHandling;
+use Tekton\Support\Contracts\ValidityChecking;
+use Tekton\Support\Contracts\SimpleStore;
+use Dynamis\Author;
 use ErrorException;
 use DateTime;
 
-class Attachment extends SmartObject implements UndefinedPropertyHandling {
+class Attachment implements ValidityChecking, SimpleStore
+{
+    protected $id;
+    protected $pathRel = '';
+    protected $pathAbs = '';
+    protected $local = false;
 
-    public $id;
-    protected $meta;
-
-    function __construct($object) {
-        if (is_numeric($object)) {
+    public function __construct($object)
+    {
+        // Construct accepts either a URI or a database Id
+        if ($object instanceof Attachment) {
+            $this->id = $object->getId();
+            $meta = wp_prepare_attachment_for_js($this->id);
+        }
+        elseif (is_numeric($object)) {
             $this->id = (int) $object;
-            $this->meta = wp_prepare_attachment_for_js($this->id);
+            $meta = wp_prepare_attachment_for_js($this->id);
         }
         else {
             $this->id = 0;
-            $this->meta = (object) array(
-                'url' => $object,
-            );
-        }
-    }
-
-    function get_property($key) {
-        switch ($key) {
-            case 'title': return $this->get_meta($key);
-            case 'filename': return $this->get_meta($key);
-            case 'url': return $this->get_meta($key);
-            case 'link': return $this->get_meta($key);
-            case 'alt': return $this->get_meta($key);
-            case 'author': return $this->get_meta($key);
-            case 'description': return $this->get_meta($key);
-            case 'caption': return $this->get_meta($key);
-            case 'name': return $this->get_meta($key);
-            case 'status': return $this->get_meta($key);
-            case 'uploadedTo': return $this->get_meta($key);
-            case 'date': return $this->get_meta($key);
-            case 'modified': return $this->get_meta($key);
-            case 'menuOrder': return $this->get_meta($key);
-            case 'mime': return $this->get_meta($key);
-            case 'type': return $this->get_meta($key);
-            case 'subtype': return $this->get_meta($key);
-            case 'icon': return $this->get_meta($key);
-            case 'dateFormatted': return $this->get_meta($key);
-            case 'nonces': return $this->get_meta($key);
-            case 'editLink': return $this->get_meta($key);
-            case 'width': return $this->get_meta($key);
-            case 'height': return $this->get_meta($key);
-            case 'sizes': return $this->get_meta($key);
-            case 'fileLength': return $this->get_meta($key);
-            case 'compat': return $this->get_meta($key);
-            case 'thumbnail': return wp_get_attachment_thumb_file($this->id);
+            $this->set('url', $object);
         }
 
-        return parent::get_property($key);
-    }
-
-    protected function get_meta($name) {
-        foreach ($this->meta as $key => $value) {
-            if (in_array($key, array('date', 'modified'))) {
-                $date = new DateTime();
-                $date->setTimestamp($value);
-                $value = $date;
-            }
-
-            if ($key == $name) {
-                return $value;
+        // Load meta into data
+        if (isset($meta) && is_array($meta)) {
+            foreach ($meta as $key => $value) {
+                if (in_array($key, array('date', 'modified'))) {
+                    $date = new DateTime();
+                    $date->setTimestamp($value);
+                    $this->set($key, $date);
+                }
+                elseif ($key == 'author') {
+                    $this->set($key, new Author($value));
+                }
+                else {
+                    $this->set($key, $value);
+                }
             }
         }
 
-        throw new ErrorException('Attachment meta not defined: '.$key);
+        // Mark if it's a local asset. Even if it's a remote URL we can treat it
+        // like a local asset if allow_furl_open is enabled
+        if (! $this->id) {
+            if (is_local_file($url = $this->get('url', ''))) {
+                $this->local = true;
+
+                if (is_url($url)) {
+                    $this->pathAbs = make_path($url);
+                    $this->pathRel = rel_path($this->pathAbs, get_path('theme'));
+                }
+                else {
+                    $this->pathAbs = realpath($url);
+                    $this->pathRel = rel_path($this->pathAbs, get_path('theme'));
+                    $this->set('url', make_url($this->pathAbs));
+                }
+            }
+        }
     }
 
-    function __toString() {
-        return $this->get_property('url');
+    public function get(string $key, $default = null)
+    {
+        return $this->{$key} ?? $default;
+    }
+
+    public function set(string $key, $value)
+    {
+        $this->{$key} = $value;
+
+        return $this;
+    }
+
+    public function exists(string $key)
+    {
+        return isset($this->{$key});
+    }
+
+    public function has(string $key)
+    {
+        // Check if it's not empty
+        if (isset($this->{$key}) && ! empty($this->{$key})) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function is(string $key)
+    {
+        // Check if it's truthy
+        if (isset($this->{$key}) && $this->{$key}) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function isLocal()
+    {
+        return $this->local;
+    }
+
+    public function isDatabase()
+    {
+        return ($this->id) ? true : false;
+    }
+
+    public function isRemote()
+    {
+        return ! $this->isLocal();
+    }
+
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    public function __toString()
+    {
+        return $this->get('url');
+    }
+
+    public function isValid()
+    {
+        return (! empty($this->get('url'))) ? true : false;
     }
 }

@@ -1,4 +1,4 @@
-<?php namespace Tekton\Wordpress\Cache;
+<?php namespace Dynamis\Cache;
 
 use InvalidArgumentException;
 use Illuminate\Contracts\Cache\Store;
@@ -16,23 +16,26 @@ class TransientStore implements Store
 	 *
 	 * @return string            The transient key.
 	 */
-	protected function generateTransientKey($key) {
+	protected function generateTransientKey($key)
+    {
 		return $this->getDomain() . '_' . md5($key);
 	}
 
-    protected function getDomain() {
-        if ( ! empty($this->domain)) {
+    protected function getDomain()
+    {
+        if (! empty($this->domain)) {
             return $this->domain;
         }
 
         return $this->domain = str_replace('\\', '_', self::class);
     }
 
-    protected function set($key, $value, $expiration) {
-		if ( ! $key || ! is_string($key)) {
+    protected function set($key, $value, $expiration)
+    {
+		if (! $key || ! is_string($key)) {
 			throw new InvalidArgumentException('Invalid cache key');
 		}
-		if ( ! is_numeric($expiration)) {
+		if (! is_numeric($expiration)) {
 			throw new InvalidArgumentException('Invalid expiration');
 		}
 
@@ -46,8 +49,9 @@ class TransientStore implements Store
      * @param  string|array  $key
      * @return mixed
      */
-    public function get($key, $default = null) {
-        if ( ! $key || ! is_string($key)) {
+    public function get($key, $default = null)
+    {
+        if (! $key || ! is_string($key)) {
             throw new InvalidArgumentException('Invalid cache key');
         }
 
@@ -66,7 +70,8 @@ class TransientStore implements Store
 	 *
 	 * @return void
 	 */
-	public function put($key, $value, $expiration) {
+	public function put($key, $value, $expiration)
+    {
 		$this->set($key, $value, $expiration);
 	}
 
@@ -79,8 +84,9 @@ class TransientStore implements Store
 	 *
 	 * @return void
 	 */
-	public function delete($key) {
-		if ( ! $key || ! is_string($key)) {
+	public function delete($key)
+    {
+		if (! $key || ! is_string($key)) {
 			throw new InvalidArgumentException('Invalid cache key');
 		}
 
@@ -95,7 +101,8 @@ class TransientStore implements Store
 	 *
 	 * @return void
 	 */
-    public function forget($key) {
+    public function forget($key)
+    {
 		$this->delete($key);
 	}
 
@@ -107,8 +114,9 @@ class TransientStore implements Store
 	 *
 	 * @return bool              True if added to cache
 	 */
-	public function forever($key, $value) {
-		return self::put($key, $value, 0);
+	public function forever($key, $value)
+    {
+		return $this->put($key, $value, 0);
 	}
 
     /**
@@ -120,7 +128,7 @@ class TransientStore implements Store
      */
     public function increment($key, $value = 1)
     {
-        $cached = self::get($key);
+        $cached = $this->get($key);
 
         if (is_numeric($cached)) {
             $cached += $value;
@@ -148,13 +156,14 @@ class TransientStore implements Store
      *
      * @return bool
      */
-    public function flush() {
+    public function flush()
+    {
  		global $wpdb;
 
  		$cachedItems = $wpdb->get_results("
  			SELECT *
  			FROM  {$wpdb->options}
- 			WHERE  option_name LIKE  '_transient_" . $this->getDomain() . "%'
+ 			WHERE  option_name LIKE  '_transient_%'
  		");
 
  		foreach ($cachedItems as $item) {

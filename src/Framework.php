@@ -1,30 +1,32 @@
-<?php namespace Tekton\Wordpress;
+<?php namespace Dynamis;
 
-use \Tekton\Framework as BaseFramework;
+use Tekton\Framework as BaseFramework;
 
-class Framework extends BaseFramework {
-
-    function __construct() {
+class Framework extends BaseFramework
+{
+    public function __construct()
+    {
         parent::__construct();
-        
-        $this->container->instance('wp.framework', $this);
 
-        if ( ! defined('TEKTON_WP_VERSION'))
-            define('TEKTON_WP_VERSION', '1.0.0');
-        if ( ! defined('TEKTON_WP_DIR'))
-            define('TEKTON_WP_DIR', __DIR__);
-        if ( ! defined('THEME_URL'))
-            define('THEME_URL', preg_replace('/\/templates$/', '', get_template_directory_uri()));
-        if ( ! defined('THEME_DIR'))
-            define('THEME_DIR', preg_replace('/\/templates$/', '', get_template_directory()));
-        if ( ! defined('THEME_PREFIX'))
-            define('THEME_PREFIX', '_tekton_');
+        $this->container->instance('dynamis', $this);
 
-        if ( ! defined('DATE_FORMAT'))
+        if (! defined('DYNAMIS'))
+            define('DYNAMIS', true);
+        if (! defined('DYNAMIS_VERSION'))
+            define('DYNAMIS_VERSION', '1.0.0');
+        if (! defined('DYNAMIS_DIR'))
+            define('DYNAMIS_DIR', __DIR__);
+        if (! defined('THEME_URL'))
+            define('THEME_URL', get_stylesheet_directory_uri());
+        if (! defined('THEME_DIR'))
+            define('THEME_DIR', get_stylesheet_directory());
+
+        if (! defined('DATE_FORMAT'))
             define('DATE_FORMAT', 'M j, Y');
     }
 
-    function init($basePath = '', $baseUri = '') {
+    public function init($basePath = '', $baseUri = '')
+    {
         if (empty($basePath)) {
             $basePath = THEME_DIR;
         }
@@ -32,45 +34,95 @@ class Framework extends BaseFramework {
             $baseUri = THEME_URL;
         }
 
-        parent::init($basePath, $baseUri);
+        return parent::init($basePath, $baseUri);
     }
 
-    function registerPaths($paths = []) {
-        $this->container->registerPath(array_merge([
+    public function registerConfig($paths = [])
+    {
+        parent::registerConfig(array_merge([
+            get_stylesheet_directory().DS.'config',
+        ], $paths));
+
+        return $this;
+    }
+
+    public function registerPaths($paths = [])
+    {
+        parent::registerPaths(array_merge([
             'cwd'        => getcwd(),
-            'stylesheet' => get_stylesheet_directory(),
-            'theme'      => get_stylesheet_directory(),
             'config'     => get_stylesheet_directory().DS.'config',
+            'public'     => ABSPATH,
+            'stylesheet' => get_stylesheet_directory(),
+            'theme'      => THEME_DIR,
+            'bootstrap'  => get_stylesheet_directory().DS.'bootstrap',
             'template'   => get_template_directory(),
+            'content'    => WP_CONTENT_DIR,
+            'plugin'     => WP_PLUGIN_DIR,
             'upload'     => wp_upload_dir()['basedir'],
             'storage'    => wp_upload_dir()['basedir'],
             'cache'      => wp_upload_dir()['basedir'].DS.'cache',
         ], $paths));
+
+        // Register dynamis cache path (this needs to be done after sub-framework
+        // conf has been merged in order to allow the cache path to be overridable)
+        $this->container->registerPath('cache.dynamis', ensure_dir_exists(get_path('cache').DS.'dynamis'));
+
+        return $this;
     }
 
-    function registerUris($uris = []) {
-        $this->container->registerUri(array_merge([
+    public function registerUris($uris = [])
+    {
+        parent::registerUris(array_merge([
+            'admin'      => get_admin_url(),
+            'public'     => get_home_url(),
             'stylesheet' => get_stylesheet_directory_uri(),
-            'theme'      => get_stylesheet_directory_uri(),
+            'theme'      => THEME_URL,
             'template'   => get_template_directory_uri(),
+            'content'    => WP_CONTENT_URL,
+            'plugin'     => WP_PLUGIN_URL,
             'upload'     => wp_upload_dir()['baseurl'],
             'storage'    => wp_upload_dir()['baseurl'],
             'cache'      => wp_upload_dir()['baseurl'].DS.'cache',
         ], $uris));
+
+        // Register dynamis cache uri (this needs to be done after sub-framework
+        // conf has been merged in order to allow the cache uri to be overridable)
+        $this->container->registerUri('cache.dynamis', ensure_dir_exists(get_uri('cache').DS.'dynamis'));
+
+        return $this;
     }
 
-    function registerCore($providers = []) {
+    public function registerCore($providers = [])
+    {
         parent::registerCore(array_merge([
-            // Core
-            \Tekton\Wordpress\Providers\TransientCacheProvider::class,
-            \Tekton\Wordpress\Providers\TemplatingProvider::class,
-            \Tekton\Wordpress\Providers\LoaderProvider::class,
-            \Tekton\Wordpress\Meta\Providers\MetaProvider::class,
+            // Dependencies
+            \Tekton\Session\Providers\SessionProvider::class,
+            \Intervention\Image\ImageServiceProviderLaravel5::class,
 
-            // Convenience
-            \Tekton\Assets\Providers\AssetsProvider::class,
-            \Tekton\Wordpress\Providers\HelpersProvider::class,
-            \Tekton\Wordpress\Providers\OptionsProvider::class,
+            // Core
+            \Dynamis\Providers\ErrorHandlerProvider::class,
+            \Dynamis\Providers\EventsProvider::class, // registers illuminate/events
+            \Dynamis\Providers\ComponentProvider::class,
+            \Dynamis\Providers\CacheProvider::class, // registers illuminate/cache
+            \Dynamis\Providers\OptionsProvider::class,
+            \Dynamis\Providers\TemplatingProvider::class,
+            \Dynamis\Providers\ImageProvider::class,
+            \Dynamis\Providers\AssetsProvider::class,
+            \Dynamis\Providers\HelpersProvider::class,
+
+            // The Theme bootstrapping support is deferred until "app: running"
+            \Dynamis\Providers\BootstrapProvider::class,
         ], $providers));
+
+        return $this;
+    }
+
+    public function clearCache()
+    {
+        // Clear files
+        parent::clearCache();
+
+        // Clear database
+        $this->app['cache']->flush();
     }
 }

@@ -1,9 +1,9 @@
 <?php namespace Dynamis\Facades;
 
-class Options extends \Dynamis\Facade
+class Components extends \Dynamis\Facade
 {
     protected static function getFacadeAccessor()
     {
-        return 'options';
+        return 'components';
     }
 }
