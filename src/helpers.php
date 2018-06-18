@@ -671,7 +671,7 @@ function component($name, $data = []) {
     return \Tekton\Components\Facades\Components::include($name, $data);
 }
 
-function post_meta($key, $id = null) {
+function post_meta($key, $id = null, $default = null) {
     if (! is_numeric($id)) {
         if (is_null($id)) {
             $id = current_post_id();
@@ -687,7 +687,7 @@ function post_meta($key, $id = null) {
         }
     }
 
-    return get_post_meta(intval($id), $key, true);
+    return get_post_meta(intval($id), $key, true) ?: $default;
 }
 
 function term_meta($key, $id) {
