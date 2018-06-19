@@ -585,8 +585,19 @@ function is_theme_asset($uri) {
     return false;
 }
 
-function is_local_file($uri) {
-    if (starts_with($uri, home_url()) && $uri != home_url()) {
+function is_local_file($uri)
+{
+    if (empty($uri)) {
+        return false;
+    }
+    
+    $homeInfo = parse_url(home_url());
+    $uriInfo = parse_url($uri);
+
+    $home = ($homeInfo['host'] ?? '').rtrim(($homeInfo['path'] ?? '/'), '/');
+    $uri = ($uriInfo['host'] ?? '').rtrim(($uriInfo['path'] ?? '/'), '/');
+
+    if (starts_with($uri, $home) && $uri != $home) {
         return true;
     }
     elseif (starts_with($uri, ABSPATH) && $uri != ABSPATH) {
@@ -596,7 +607,8 @@ function is_local_file($uri) {
     return false;
 }
 
-function path_to_url($path) {
+function path_to_url($path)
+{
     if (is_url($path)) {
         return $path;
     }
