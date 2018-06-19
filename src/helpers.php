@@ -601,28 +601,28 @@ function path_to_url($path) {
         return $path;
     }
 
-    $abs = canonicalize($path);
+    $path = canonicalize($path);
 
     // Find out what directory the path is pointing to so that we can get the
     // relative path correctly no matter the wordpress configuration. Start with
     // what we assume is the bottom common denominator.
-    if (starts_with($abs, $theme = get_path('theme'))) {
-        return get_uri('theme').'/'.rel_path($abs, $theme);
+    if (starts_with($path, $theme = get_path('theme'))) {
+        return get_uri('theme').'/'.rel_path($path, $theme);
     }
-    if (starts_with($abs, $plugin = get_path('plugin'))) {
-        return get_uri('plugin').'/'.rel_path($abs, $plugin);
+    if (starts_with($path, $plugin = get_path('plugin'))) {
+        return get_uri('plugin').'/'.rel_path($path, $plugin);
     }
-    if (starts_with($abs, $upload = get_path('upload'))) {
-        return get_uri('upload').'/'.rel_path($abs, $upload);
+    if (starts_with($path, $upload = get_path('upload'))) {
+        return get_uri('upload').'/'.rel_path($path, $upload);
     }
-    if (starts_with($abs, $content = get_path('content'))) {
-        return get_uri('content').'/'.rel_path($abs, $content);
+    if (starts_with($path, $content = get_path('content'))) {
+        return get_uri('content').'/'.rel_path($path, $content);
     }
-    if (starts_with($abs, $public = get_path('public'))) {
-        return get_uri('public').'/'.rel_path($abs, $public);
+    if (starts_with($path, $public = get_path('public'))) {
+        return get_uri('public').'/'.rel_path($path, $public);
     }
 
-    return $abs;
+    return $path;
 }
 
 // This one is not perfect and can get messed up from mod rewrites
@@ -630,6 +630,8 @@ function url_to_path($url) {
     if (! is_url($url)) {
         return $url;
     }
+
+    $url = canonicalize($url);
 
     // Find out what directory the url is pointing to so that we can get the
     // relative url correctly no matter the wordpress configuration. Start with

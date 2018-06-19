@@ -72,7 +72,8 @@ class Framework extends BaseFramework
 
     public function registerUris($uris = [])
     {
-        parent::registerUris(array_merge([
+        // Set default uris
+        $default = [
             'admin'      => get_admin_url(),
             'public'     => get_home_url(),
             'stylesheet' => get_stylesheet_directory_uri(),
@@ -83,7 +84,19 @@ class Framework extends BaseFramework
             'upload'     => wp_upload_dir()['baseurl'],
             'storage'    => wp_upload_dir()['baseurl'],
             'cache'      => wp_upload_dir()['baseurl'].DS.'cache',
-        ], $uris));
+        ];
+
+        // Make sure default URIs are the correct protocol
+        if (is_ssl()) {
+            foreach ($default as $key => $val) {
+                if (! starts_with($val, 'https://')) {
+                    $default[$key] = str_replace('http://', 'https://', $val);
+                }
+            }
+        }
+
+        // Merge default with user config
+        parent::registerUris($default, $uris);
 
         // Register dynamis cache uri (this needs to be done after sub-framework
         // conf has been merged in order to allow the cache uri to be overridable)

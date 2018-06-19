@@ -16,7 +16,7 @@
         "php": ">=7.0.0",
         "composer/installers": "~1.0",
         "tekton/framework": "^2.0.0",
-        "tekton/assets": "^2.0.0",
+        "tekton/assets": "^2.0.2",
         "tekton/support": "^2.0.0",
         "tekton/session": "^2.0.0",
         "tekton/components": "^1.0.0",
