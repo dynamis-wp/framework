@@ -33,7 +33,8 @@ class ComponentProvider extends ServiceProvider
                 'scripts' => 'js',
                 'fields' => 'fields.php',
                 'data' => 'data.php',
-                'boot' => 'boot.php'
+                'boot' => 'boot.php',
+                'shortcode' => 'shortcode.php'
             ]);
 
             // Set up cache paths
@@ -240,10 +241,29 @@ class ComponentProvider extends ServiceProvider
             $name = $prefix.$component->getName();
 
             if (! in_array($name, $this->defaultShortCodes) || in_array($name, $overrides)) {
-                add_shortcode($name, function($attr) use ($component) {
-                    $dataDef = $component->get('data', null);
-                    $data = (! is_null($dataDef)) ? require $dataDef : [];
-                    $data = shortcode_atts($data, $attr);
+                add_shortcode($name, function($attr, $content = '') use ($component) {
+                    // Set component arguments from shortcode attributes
+                    if ($component->has('data')) {
+                        $dataDef = require $component->get('data');
+                    }
+
+                    $data = shortcode_atts($dataDef ?? [], $attr);
+
+                    // Set content to slot
+                    if (empty($data['slot']) && ! empty($content)) {
+                        $data['slot'] = $content;
+                    }
+
+                    // If component has a shortcode handler we pass the attributes
+                    // and content on to it for it be assembled
+                    if ($component->has('shortcode')) {
+                        $handler = require $component->get('shortcode');
+                        $assembled = $handler($data, $content) ?? false;
+
+                        if ($assembled) {
+                            $data = $assembled;
+                        }
+                    }
 
                     return app('components')->include($component, $data);
                 });
