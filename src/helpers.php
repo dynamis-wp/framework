@@ -1,5 +1,39 @@
 <?php
 
+function component_args_from_shortcode($tag, $content)
+{
+    $pattern = get_shortcode_regex();
+
+    if (preg_match_all('/'.$pattern.'/s', $content, $matches) && isset($matches[2]) && in_array($tag, $matches[2])) {
+        $components = app('components');
+        $component = $components->get($tag);
+        $result = [];
+
+        if ($component) {
+            if ($component->has('data')) {
+                $dataDef = require $component->get('data');
+            }
+
+            foreach ($matches[0] as $index => $match) {
+                // Set component arguments from shortcode attributes
+                $atts = shortcode_parse_atts($matches[3][$index]);
+                $data = shortcode_atts($dataDef ?? [], $atts);
+
+                // Set content to slot
+                if (empty($data['slot']) && ! empty($matches[5][$index])) {
+                    $data['slot'] = $matches[5][$index];
+                }
+
+                $result[] = $data;
+            }
+        }
+
+        return $result;
+    }
+
+    return null;
+}
+
 function get_url_by_template($template)
 {
     $id = get_id_by_template($template);
@@ -590,7 +624,7 @@ function is_local_file($uri)
     if (empty($uri)) {
         return false;
     }
-    
+
     $homeInfo = parse_url(home_url());
     $uriInfo = parse_url($uri);
 
