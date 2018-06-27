@@ -9,23 +9,21 @@ function component_args_from_shortcode($tag, $content)
         $component = $components->get($tag);
         $result = [];
 
-        if ($component) {
-            if ($component->has('data')) {
-                $dataDef = require $component->get('data');
+        if ($component && $component->has('data')) {
+            $dataDef = require $component->get('data');
+        }
+
+        foreach ($matches[0] as $index => $match) {
+            // Set component arguments from shortcode attributes
+            $atts = shortcode_parse_atts($matches[3][$index]);
+            $data = (isset($dataDef)) ? shortcode_atts($dataDef, $atts) : $atts;
+
+            // Set content to slot
+            if (empty($data['slot']) && ! empty($matches[5][$index])) {
+                $data['slot'] = $matches[5][$index];
             }
 
-            foreach ($matches[0] as $index => $match) {
-                // Set component arguments from shortcode attributes
-                $atts = shortcode_parse_atts($matches[3][$index]);
-                $data = shortcode_atts($dataDef ?? [], $atts);
-
-                // Set content to slot
-                if (empty($data['slot']) && ! empty($matches[5][$index])) {
-                    $data['slot'] = $matches[5][$index];
-                }
-
-                $result[] = $data;
-            }
+            $result[] = $data;
         }
 
         return $result;
