@@ -3,7 +3,7 @@
 function current_url()
 {
     global $wp;
-    echo home_url($wp->request);
+    return home_url($wp->request);
 }
 
 function component_args_from_shortcode($tag, $content)
