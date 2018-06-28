@@ -1,5 +1,11 @@
 <?php
 
+function current_url()
+{
+    global $wp;
+    echo home_url($wp->request);
+}
+
 function component_args_from_shortcode($tag, $content)
 {
     $pattern = get_shortcode_regex();
