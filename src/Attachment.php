@@ -51,8 +51,6 @@ class Attachment implements ValidityChecking, SimpleStore
         // like a local asset if allow_furl_open is enabled
         if (! $this->id) {
             if (is_local_file($url = $this->get('url', ''))) {
-                $this->local = true;
-
                 if (is_url($url)) {
                     $this->pathAbs = make_path(canonicalize($url));
                     $this->pathRel = rel_path($this->pathAbs, get_path('public'));
@@ -67,6 +65,9 @@ class Attachment implements ValidityChecking, SimpleStore
                 if (! file_exists($this->pathAbs)) {
                     $this->pathAbs = null;
                     $this->set('url', null);
+                }
+                else {
+                    $this->local = true;
                 }
             }
         }
