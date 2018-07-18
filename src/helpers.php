@@ -706,6 +706,14 @@ function url_to_path($url) {
 }
 
 function make_path($url) {
+    if (is_numeric($url)) {
+        $post = post($url);
+
+        if (is_valid($post)) {
+            $url = $post->url;
+        }
+    }
+
     if (! is_url($url)) {
         return $url;
     }
@@ -716,6 +724,13 @@ function make_path($url) {
 function make_url($path) {
     if (is_url($path)) {
         return $path;
+    }
+    elseif (is_numeric($path)) {
+        $post = post($path);
+
+        if (is_valid($post)) {
+            return $post->url;
+        }
     }
 
     return path_to_url($path);
