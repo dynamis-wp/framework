@@ -131,42 +131,19 @@ class ComponentProvider extends ServiceProvider
     protected function registerComponentBootstrap()
     {
         add_action('dynamis_bootstrap', function() {
-            // Queue component assets (can be compiled to one file)
-            if (app_env('production')) {
-                // Get cache paths
-                $cacheBootstrap = get_path('cache.dynamis').DS.'components.php';
+            // Include all component boot files
+            $components = app('components')->all();
+            $files = [];
 
-                // Compile files if they don't exist yet
-                if (! file_exists($cacheBootstrap)) {
-                    $components = app('components')->all();
-                    $files = [];
-
-                    foreach ($components as $component) {
-                        if ($component->has('boot')) {
-                            $files[] = $component->get('boot');
-                        }
-                    }
-
-                    $combined = concat_php_files($files);
-                    write_string_to_file($cacheBootstrap, $combined);
+            // Queue component bootstrap
+            foreach ($components as $component) {
+                if ($component->has('boot')) {
+                    $files[] = $component->get('boot');
                 }
-
-                include_global($cacheBootstrap);
             }
-            else {
-                $components = app('components')->all();
-                $files = [];
 
-                // Queue component bootstrap
-                foreach ($components as $component) {
-                    if ($component->has('boot')) {
-                        $files[] = $component->get('boot');
-                    }
-                }
-
-                foreach ($files as $path) {
-                    include_global($path);
-                }
+            foreach ($files as $path) {
+                include_global($path);
             }
         });
     }
