@@ -22,10 +22,10 @@ function component_args_from_shortcode($tag, $content)
         foreach ($matches[0] as $index => $match) {
             // Set component arguments from shortcode attributes
             $atts = shortcode_parse_atts($matches[3][$index]);
-            $data = (isset($dataDef)) ? shortcode_atts($dataDef, $atts) : $atts;
+            $data = (isset($dataDef)) ? shortcode_atts($dataDef, $atts) : (array) $atts;
 
             // Set content to slot
-            if (empty($data['slot']) && ! empty($matches[5][$index])) {
+            if (! isset($data['slot']) && ! empty($matches[5][$index])) {
                 $data['slot'] = $matches[5][$index];
             }
 
